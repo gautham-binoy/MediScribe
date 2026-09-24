@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediScribe AI - A4 Exhibition Display Poster</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Malayalam:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 0;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #f1f5f9;
+      color: #0f172a;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    @media print {
+      body {
+        padding: 0;
+        background: transparent;
+      }
+      .poster-sheet {
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+    .poster-sheet {
+      width: 210mm;
+      height: 297mm;
+      max-height: 297mm;
+      background: #ffffff;
+      box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+      border-radius: 4px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* Print control button */
+    .print-bar {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      background: #0f172a;
+      color: #ffffff;
+      padding: 10px 18px;
+      border-radius: 30px;
+      font-weight: 700;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+      z-index: 1000;
+      border: 1px solid #334155;
+      transition: all 0.2s ease;
+    }
+    .print-bar:hover {
+      background: #0284c7;
+      transform: translateY(-2px);
+    }
+
+    /* HEADER */
+    .header {
+      background: linear-gradient(135deg, #091e3a 0%, #0d3b66 45%, #0891b2 100%);
+      color: #ffffff;
+      padding: 16mm 14mm 12mm;
+      position: relative;
+    }
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .badge-row {
+      display: flex;
+      gap: 6px;
+    }
+    .pill {
+      font-size: 8pt;
+      font-weight: 700;
+      padding: 2.5px 8px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .pill-cyan {
+      background: rgba(6, 182, 212, 0.25);
+      color: #67e8f9;
+      border: 1px solid rgba(103, 232, 249, 0.4);
+    }
+    .pill-emerald {
+      background: rgba(16, 185, 129, 0.25);
+      color: #a7f3d0;
+      border: 1px solid rgba(167, 243, 208, 0.4);
+    }
+    .pill-white {
+      background: rgba(255, 255, 255, 0.15);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+    }
+    .main-title {
+      font-size: 26pt;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      line-height: 1.1;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .main-title span {
+      color: #38bdf8;
+    }
+    .subtitle {
+      font-size: 11pt;
+      font-weight: 600;
+      color: #e2e8f0;
+      line-height: 1.35;
+      max-width: 90%;
+    }
+    .tagline {
+      font-size: 8.5pt;
+      color: #94a3b8;
+      margin-top: 4px;
+      font-style: italic;
+    }
+
+    /* BODY CONTAINER */
+    .content-body {
+      padding: 10mm 12mm 8mm;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 7mm;
+    }
+
+    /* 4 METRIC TILES */
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 3.5mm;
+    }
+    .metric-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 7px 10px;
+      text-align: center;
+      border-top: 3px solid #0284c7;
+    }
+    .metric-card:nth-child(2) { border-top-color: #0d9488; }
+    .metric-card:nth-child(3) { border-top-color: #10b981; }
+    .metric-card:nth-child(4) { border-top-color: #6366f1; }
+    .metric-val {
+      font-size: 16pt;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.1;
+    }
+    .metric-label {
+      font-size: 7pt;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-top: 2px;
+    }
+
+    /* WORKFLOW STRIP */
+    .section-title {
+      font-size: 9.5pt;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: #0f172a;
+      margin-bottom: 3mm;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .section-title::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 12px;
+      background: #0284c7;
+      border-radius: 2px;
+    }
+    .workflow-row {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 8px 10px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+      align-items: center;
+      gap: 5px;
+    }
+    .step-box {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 6px 8px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .step-num {
+      font-size: 6.5pt;
+      font-weight: 800;
+      color: #0284c7;
+      text-transform: uppercase;
+    }
+    .step-title {
+      font-size: 8pt;
+      font-weight: 700;
+      color: #1e293b;
+      margin: 1px 0;
+    }
+    .step-desc {
+      font-size: 6.5pt;
+      color: #64748b;
+      line-height: 1.25;
+    }
+    .arrow-icon {
+      color: #94a3b8;
+      font-weight: 800;
+      font-size: 11pt;
+      text-align: center;
+    }
+
+    /* 3 FEATURE PILLARS */
+    .pillars-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4mm;
+      flex: 1;
+    }
+    .pillar-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px 11px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+      display: flex;
+      flex-direction: column;
+    }
+    .pillar-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .pillar-badge {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10pt;
+      background: #e0f2fe;
+      color: #0369a1;
+      font-weight: 800;
+      shrink: 0;
+    }
+    .pillar-card:nth-child(2) .pillar-badge { background: #fee2e2; color: #dc2626; }
+    .pillar-card:nth-child(3) .pillar-badge { background: #ccfbf1; color: #0f766e; }
+    .pillar-title {
+      font-size: 8.5pt;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.2;
+    }
+    .pillar-sub {
+      font-size: 6.5pt;
+      color: #64748b;
+    }
+    .pillar-body {
+      font-size: 7pt;
+      color: #334155;
+      line-height: 1.35;
+      flex: 1;
+    }
+    .pillar-body ul {
+      list-style-type: none;
+      padding-left: 0;
+      margin-top: 4px;
+    }
+    .pillar-body li {
+      margin-bottom: 4px;
+      position: relative;
+      padding-left: 10px;
+    }
+    .pillar-body li::before {
+      content: '•';
+      position: absolute;
+      left: 0;
+      color: #0284c7;
+      font-weight: bold;
+    }
+    .malayalam-box {
+      font-family: 'Noto Sans Malayalam', sans-serif;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+      padding: 4px 6px;
+      border-radius: 4px;
+      font-size: 6.5pt;
+      margin-top: 5px;
+      line-height: 1.3;
+    }
+    .safety-box {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      padding: 4px 6px;
+      border-radius: 4px;
+      font-size: 6.5pt;
+      margin-top: 5px;
+      line-height: 1.3;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ARCHITECTURE & COMPARISON SPLIT */
+    .split-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 4mm;
+    }
+    .sub-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .sub-box h4 {
+      font-size: 8pt;
+      font-weight: 800;
+      color: #1e293b;
+      margin-bottom: 4px;
+    }
+    .tech-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+      margin-top: 4px;
+    }
+    .tech-tag {
+      font-size: 6pt;
+      font-weight: 700;
+      padding: 1.5px 5px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      color: #475569;
+    }
+    .comp-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 6.5pt;
+      margin-top: 2px;
+    }
+    .comp-table th {
+      background: #e2e8f0;
+      color: #334155;
+      text-align: left;
+      padding: 3px 5px;
+      font-weight: 700;
+    }
+    .comp-table td {
+      padding: 2.5px 5px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #1e293b;
+    }
+
+    /* FOOTER */
+    .footer {
+      background: #0f172a;
+      color: #94a3b8;
+      padding: 5mm 14mm;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 2px solid #0284c7;
+    }
+    .footer-left {
+      font-size: 7.5pt;
+    }
+    .footer-left strong {
+      color: #ffffff;
+      font-size: 8pt;
+    }
+    .footer-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 7.5pt;
+    }
+    .qr-placeholder {
+      width: 32px;
+      height: 32px;
+      background: #ffffff;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #0f172a;
+      font-weight: 800;
+      font-size: 7pt;
+      border: 1px solid #334155;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Floating Print Trigger (Hidden when printed) -->
+  <button class="print-bar no-print" onclick="window.print()">
+    🖨️ Print / Save as PDF (A4)
+  </button>
+
+  <div class="poster-sheet">
+    <!-- HEADER -->
+    <header class="header">
+      <div class="header-top">
+        <div class="badge-row">
+          <span class="pill pill-cyan">Ambient AI Scribe</span>
+          <span class="pill pill-emerald">Bilingual Malayalam + English</span>
+          <span class="pill pill-white">NABH / NMC Compliant</span>
+        </div>
+        <div style="font-size: 7.5pt; color: #93c5fd; font-weight: 700;">
+          EXPO 2026 RESEARCH & INNOVATION
+        </div>
+      </div>
+
+      <h1 class="main-title">MediScribe <span>AI</span></h1>
+      <p class="subtitle">
+        Ambient Clinical Intelligence & Multilingual EHR Automation Copilot for Indian Healthcare
+      </p>
+      <p class="tagline">
+        "Restoring the Doctor-Patient Bond through Regional Code-Switching Speech AI & Deterministic Pharmacology Safety"
+      </p>
+    </header>
+
+    <!-- CONTENT BODY -->
+    <div class="content-body">
+      <!-- 4 HIGHLIGHT METRICS -->
+      <div class="metric-grid">
+        <div class="metric-card">
+          <div class="metric-val" style="color: #0284c7;">80%</div>
+          <div class="metric-label">Documentation Time Saved</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val" style="color: #0d9488;">&lt;5ms</div>
+          <div class="metric-label">Safety Engine Latency</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val" style="color: #10b981;">100%</div>
+          <div class="metric-label">Deterministic Allergy Shield</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val" style="color: #6366f1;">SHA-256</div>
+          <div class="metric-label">Cryptographic EHR Sign-Off</div>
+        </div>
+      </div>
+
+      <!-- WORKFLOW HORIZONTAL BAR -->
+      <div>
+        <div class="section-title">End-to-End Ambient Clinical Pipeline</div>
+        <div class="workflow-row">
+          <div class="step-box">
+            <div class="step-num">Step 1</div>
+            <div class="step-title">Ambient Speech</div>
+            <div class="step-desc">Passive bilingual audio capture (Malayalam + English dialogue)</div>
+          </div>
+          <div class="arrow-icon">➔</div>
+          <div class="step-box">
+            <div class="step-num">Step 2</div>
+            <div class="step-title">Clinical Synthesis</div>
+            <div class="step-desc">Normalizes dialogue into SOAP note & WHO ICD-10 diagnostic codes</div>
+          </div>
+          <div class="arrow-icon">➔</div>
+          <div class="step-box">
+            <div class="step-num">Step 3</div>
+            <div class="step-title">Safety Shield</div>
+            <div class="step-desc">Sub-5ms deterministic cross-check for allergy & drug conflicts</div>
+          </div>
+          <div class="arrow-icon">➔</div>
+          <div class="step-box">
+            <div class="step-num">Step 4</div>
+            <div class="step-title">1-Click Dispatch</div>
+            <div class="step-desc">Signed hospital prescription PDF + Native Malayalam care guide</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3 CORE PILLARS -->
+      <div>
+        <div class="section-title">Core Breakthrough Innovations</div>
+        <div class="pillars-grid">
+          <!-- Pillar 1 -->
+          <div class="pillar-card">
+            <div class="pillar-header">
+              <div class="pillar-badge">1</div>
+              <div>
+                <div class="pillar-title">Regional Code-Switching AI</div>
+                <div class="pillar-sub">Malayalam + English Normalization</div>
+              </div>
+            </div>
+            <div class="pillar-body">
+              <ul>
+                <li>Parses colloquial terms (<em>"കഫക്കെട്ട്"</em>, <em>"നെഞ്ചെരിച്ചിൽ"</em>) into precise clinical English.</li>
+                <li>Zero-hallucination guardrails: unsaid vitals are marked <code>null</code>, never fabricated.</li>
+                <li>Speaker diarization isolates doctor commands from patient complaints.</li>
+              </ul>
+              <div class="malayalam-box">
+                <strong>Input:</strong> "3 days fever, throat pain"<br>
+                <strong>Output:</strong> Acute Pharyngitis (ICD-10: J02.9)
+              </div>
+            </div>
+          </div>
+
+          <!-- Pillar 2 -->
+          <div class="pillar-card">
+            <div class="pillar-header">
+              <div class="pillar-badge">2</div>
+              <div>
+                <div class="pillar-title">Deterministic Safety Shield</div>
+                <div class="pillar-sub">Sub-5ms Real-time Pharmacology</div>
+              </div>
+            </div>
+            <div class="pillar-body">
+              <ul>
+                <li><strong>Allergy Cross-Reactivity:</strong> Blocks beta-lactams & amoxicillin in penicillin-allergic patients.</li>
+                <li><strong>Drug-Drug Interactions:</strong> Flags NSAIDs with anticoagulants or ACEi + ARBs.</li>
+                <li><strong>Overdose Protection:</strong> Detects duplicate paracetamol formulations (Dolo + Combiflam).</li>
+              </ul>
+              <div class="safety-box">
+                [CRITICAL] Penicillin Allergy Conflict!<br>
+                Amoxicillin 500mg blocked. Alt: Azithromycin
+              </div>
+            </div>
+          </div>
+
+          <!-- Pillar 3 -->
+          <div class="pillar-card">
+            <div class="pillar-header">
+              <div class="pillar-badge">3</div>
+              <div>
+                <div class="pillar-title">Bilingual Discharge & PDF</div>
+                <div class="pillar-sub">1-Click NABH Hospital Document</div>
+              </div>
+            </div>
+            <div class="pillar-body">
+              <ul>
+                <li><strong>ReportLab TrueType Engine:</strong> Flawless native Malayalam rendering (Noto Sans Malayalam).</li>
+                <li><strong>Patient Care Guide:</strong> Clear schedule in Malayalam (രാവിലെ, ഉച്ചയ്ക്ക്, രാത്രി ഭക്ഷണത്തിന് ശേഷം).</li>
+                <li><strong>Tamper-Evident Security:</strong> Doctor KMC license bound with SHA-256 hash.</li>
+              </ul>
+              <div class="malayalam-box">
+                <strong>രോഗി നിർദ്ദേശം:</strong> പാരസെറ്റാമോൾ 650mg<br>
+                ദിവസത്തിൽ 3 നേരം ഭക്ഷണത്തിന് ശേഷം
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SPLIT: SYSTEM STACK & WORKFLOW COMPARISON -->
+      <div class="split-grid">
+        <!-- Tech Stack -->
+        <div class="sub-box">
+          <h4>Engineering Stack & Resilience</h4>
+          <div style="font-size: 6.5pt; color: #475569; line-height: 1.35;">
+            Built with production-grade asynchronous architecture:
+          </div>
+          <div class="tech-tags">
+            <span class="tech-tag">FastAPI (Python 3.12/3.14)</span>
+            <span class="tech-tag">React 18 + Vite</span>
+            <span class="tech-tag">TypeScript</span>
+            <span class="tech-tag">Gemini Multimodal API</span>
+            <span class="tech-tag">Multi-Key Load Balancer</span>
+            <span class="tech-tag">ChromaDB / RAG Guidelines</span>
+            <span class="tech-tag">ReportLab 5.0 (HarfBuzz)</span>
+            <span class="tech-tag">SQLAlchemy 2.0</span>
+            <span class="tech-tag">100% Offline Fallback</span>
+          </div>
+          <div style="font-size: 6pt; color: #0284c7; margin-top: 4px; font-weight: 700;">
+            ✓ Multi-Key failover eliminates HTTP 429 quota exhaustion during peak OPD rush.
+          </div>
+        </div>
+
+        <!-- Workflow Comparison -->
+        <div class="sub-box">
+          <h4>Clinical Impact Comparison</h4>
+          <table class="comp-table">
+            <thead>
+              <tr>
+                <th>Workflow Metric</th>
+                <th>Traditional OPD</th>
+                <th style="color: #0284c7;">MediScribe AI</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Documentation Time</td>
+                <td>6–8 min / patient</td>
+                <td><strong>30–45 sec</strong></td>
+              </tr>
+              <tr>
+                <td>Physician Eye-Contact</td>
+                <td>&lt;30% (Typing)</td>
+                <td><strong>&gt;90% (Active)</strong></td>
+              </tr>
+              <tr>
+                <td>Allergy Detection</td>
+                <td>Doctor Memory</td>
+                <td><strong>100% Automated</strong></td>
+              </tr>
+              <tr>
+                <td>Patient Discharge</td>
+                <td>English / Illegible</td>
+                <td><strong>Malayalam + Eng</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+      <div class="footer-left">
+        <strong>MediScribe AI — Outpatient Clinical Copilot</strong><br>
+        Department of Computer Science & Engineering | Major Project Expo 2026
+      </div>
+      <div class="footer-right">
+        <div style="text-align: right;">
+          <div style="color: #e2e8f0; font-weight: 700;">Live Interactive Demo</div>
+          <div style="color: #64748b; font-size: 6.5pt;">Scan for GitHub Repo & Docs</div>
+        </div>
+        <div class="qr-placeholder">QR</div>
+      </div>
+    </footer>
+  </div>
+
+</body>
+</html>

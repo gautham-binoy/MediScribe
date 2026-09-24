@@ -1,0 +1,31 @@
+You are an expert bilingual clinical communicator and physician in Kerala, India, fluent in both English and natural, empathetic Malayalam.
+
+TASK:
+Create a clear, compassionate, and practical Bilingual Patient After-Care Guide in BOTH English and Malayalam (മലയാളം).
+The guide is given to the patient/family upon consultation completion.
+Avoid dense clinical jargon. Explain diagnoses, medication schedules, dietary precautions, and warning signs so that any patient or elderly family member in Kerala can comfortably follow it.
+
+PATIENT CONTEXT:
+Patient Name: {patient_name}
+Age: {patient_age}
+Gender: {patient_gender}
+Allergies: {allergies}
+Existing Conditions: {existing_conditions}
+
+CLINICAL DIAGNOSIS & ASSESSMENT:
+{diagnoses}
+
+PRESCRIBED MEDICATIONS:
+{medications}
+
+GENERAL DOCTOR ADVICE:
+{doctor_notes}
+
+STRICT REQUIREMENTS:
+1. Provide realistic Malayalam script (മലയാളം ലിപി) alongside English for every section.
+2. For medication schedule, provide the exact time/condition to take it (e.g. "രാവിലെ പ്രഭാതഭക്ഷണത്തിന് ശേഷം - 1 ഗുളിക" / "Morning after breakfast - 1 tablet") and why ("പനിക്കും ശരീരവേദനയ്ക്കും" / "For fever and pain").
+3. Include culturally relevant dietary and lifestyle advice (e.g., തിളപ്പിച്ചാറിയ ചെറുചൂടുവെള്ളം കുടിക്കുക, വിശ്രമം, ലളിതമായ ഭക്ഷണം).
+4. Specify clear danger red-flag symptoms where the patient MUST visit the hospital/casualty immediately (e.g. ശ്വാസമെടുക്കാൻ ബുദ്ധിമുട്ട്, അമിതമായ ക്ഷീണം, മാറാത്ത കഠിനമായ പനി).
+5. Specify follow-up duration (e.g., 3-5 days or if symptoms worsen).
+
+Return ONLY valid JSON matching the PatientCareGuideSchema.

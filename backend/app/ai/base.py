@@ -9,6 +9,7 @@ from app.ai.schemas.ai_schemas import (
     ICDListSchema,
     InvestigationListSchema,
     MultilingualNormalizationSchema,
+    PatientCareGuideSchema,
     PrescriptionDraftSchema,
     SOAPNoteSchema,
 )
@@ -78,3 +79,14 @@ class AIProvider(ABC):
         self, diagnoses: list[str], extraction: ClinicalExtractionSchema, rag_context: str
     ) -> ICDListSchema:
         """Suggest relevant ICD-10 diagnostic classifications."""
+
+    @abstractmethod
+    async def generate_patient_guide(
+        self,
+        patient_context: dict[str, Any],
+        diagnoses: list[str],
+        medications: list[dict[str, Any]],
+        doctor_notes: str | None = None,
+    ) -> PatientCareGuideSchema:
+        """Synthesize a bilingual patient after-care and recovery guide (Malayalam + English)."""
+

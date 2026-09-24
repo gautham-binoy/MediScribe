@@ -24,14 +24,22 @@ from app.schemas.consultation import (
     ConsultationCreate,
     ConsultationDetailResponse,
     ConsultationResponse,
+    PatientCareGuideUpdateRequest,
+    SafetyCheckRequest,
     TranscriptResponse,
     TranscriptUpdateRequest,
 )
 from app.services.consultation_service import ConsultationService
+from app.services.pdf_service import PrescriptionPDFGenerator
+from app.services.safety_service import SafetyAlert, SafetyCheckerService
 from app.transcription.gemini_transcriber import GeminiTranscriber
 from app.transcription.mock_transcriber import MockTranscriber
+from app.core.logging import logger
+from fastapi.responses import StreamingResponse
+from io import BytesIO
 
 router = APIRouter(prefix="/consultations", tags=["Consultations"])
+
 
 
 @router.post("", response_model=ConsultationResponse, status_code=status.HTTP_201_CREATED)
@@ -89,7 +97,31 @@ def get_consultation(
         if inv.source:
             sources.add(inv.source)
     detail.rag_sources = list(sources)
+
+    # Live Pharmacology & Allergy Conflict Checks
+    rx_items = []
+    if consultation.prescription and consultation.prescription.items:
+        rx_items = [
+            {
+                "medication_name": item.medication_name,
+                "strength": item.strength,
+                "dose": item.dose,
+                "route": item.route,
+                "frequency": item.frequency,
+                "duration": item.duration,
+            }
+            for item in consultation.prescription.items
+        ]
+    patient = consultation.patient
+    safety_alerts = SafetyCheckerService.check_prescription_safety(
+        patient_allergies=patient.allergies if patient else None,
+        patient_conditions=patient.existing_conditions if patient else None,
+        patient_medications=patient.current_medications if patient else None,
+        prescribed_items=rx_items,
+    )
+    detail.safety_alerts = safety_alerts
     return detail
+
 
 
 @router.put("/{id}/transcript", response_model=TranscriptResponse)
@@ -342,3 +374,101 @@ async def upload_audio_file(
         actor=current_user,
     )
     return TranscriptResponse.model_validate(transcript)
+
+
+@router.get("/{id}/prescription-pdf")
+def download_prescription_pdf(
+    id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate and stream high-definition official hospital prescription PDF."""
+    consultation = ConsultationService.get_by_id_or_code(db, id)
+    if not consultation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Consultation {id} not found"
+        )
+
+    try:
+        pdf_bytes = PrescriptionPDFGenerator.generate(consultation)
+        filename = f"Prescription_{consultation.consultation_id}.pdf"
+        return StreamingResponse(
+            BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'inline; filename="{filename}"',
+            },
+        )
+    except Exception as e:
+        logger.error(f"Failed to generate prescription PDF: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate PDF: {str(e)}",
+        )
+
+
+@router.post("/{id}/safety-check", response_model=list[SafetyAlert])
+def check_medication_safety(
+    id: str,
+    payload: SafetyCheckRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Live Drug-Allergy & Drug-Drug Conflict Checker.
+    Validates any custom or current list of prescribed items against
+    patient's documented allergies and chronic condition profile.
+    """
+    consultation = ConsultationService.get_by_id_or_code(db, id)
+    if not consultation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Consultation {id} not found"
+        )
+
+    patient = consultation.patient
+    alerts = SafetyCheckerService.check_prescription_safety(
+        patient_allergies=patient.allergies if patient else None,
+        patient_conditions=patient.existing_conditions if patient else None,
+        patient_medications=patient.current_medications if patient else None,
+        prescribed_items=payload.items,
+    )
+    return alerts
+
+
+@router.post("/{id}/patient-guide", response_model=ConsultationDetailResponse)
+async def regenerate_patient_care_guide(
+    id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Regenerate Bilingual Patient Care Guide (Malayalam + English) using AI."""
+    try:
+        consultation = await ConsultationService.regenerate_patient_guide_for_consultation(
+            db=db, consultation_id=id, actor=current_user
+        )
+        return get_consultation(id=consultation.id, db=db, current_user=current_user)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.put("/{id}/patient-guide", response_model=ConsultationDetailResponse)
+def update_patient_care_guide(
+    id: str,
+    guide_in: PatientCareGuideUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Save doctor's edits to the Bilingual Patient Care Guide."""
+    try:
+        consultation = ConsultationService.update_patient_guide(
+            db=db,
+            consultation_id=id,
+            guide_english=guide_in.patient_guide_english,
+            guide_malayalam=guide_in.patient_guide_malayalam,
+            guide_json=guide_in.patient_guide_json,
+            actor=current_user,
+        )
+        return get_consultation(id=consultation.id, db=db, current_user=current_user)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+

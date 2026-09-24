@@ -5,6 +5,8 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.ai.factory import get_ai_provider
+from app.ai.schemas.ai_schemas import PatientCareGuideSchema
+from app.core.logging import logger
 from app.models.clinical import (
     Approval,
     ClinicalExtraction,
@@ -338,6 +340,33 @@ class ConsultationService:
             )
             db.add(icd_model)
 
+        # 9. Bilingual Patient Care Guide (Malayalam + English)
+        try:
+            rx_items_dict = [
+                {
+                    "medication_name": item.medication_name,
+                    "strength": item.strength,
+                    "dose": item.dose,
+                    "route": item.route,
+                    "frequency": item.frequency,
+                    "duration": item.duration,
+                    "instructions": item.instructions,
+                }
+                for item in rx_draft.items
+            ]
+            guide = await ai.generate_patient_guide(
+                patient_context=patient_context,
+                diagnoses=diag_names,
+                medications=rx_items_dict,
+                doctor_notes=rx_draft.general_instructions,
+            )
+            consultation.patient_guide_json = guide.model_dump()
+            en_text, ml_text = ConsultationService.format_guide_texts(guide)
+            consultation.patient_guide_english = en_text
+            consultation.patient_guide_malayalam = ml_text
+        except Exception as e:
+            logger.warning(f"Error generating patient guide in draft: {e}")
+
         # Transition status to PENDING_REVIEW
         consultation.status = "PENDING_REVIEW"
         consultation.ended_at = datetime.now(UTC)
@@ -442,6 +471,14 @@ class ConsultationService:
                 )
                 db.add(icd_model)
 
+        # Update Patient Care Guide if provided
+        if draft_in.patient_guide_english is not None:
+            consultation.patient_guide_english = draft_in.patient_guide_english
+        if draft_in.patient_guide_malayalam is not None:
+            consultation.patient_guide_malayalam = draft_in.patient_guide_malayalam
+        if draft_in.patient_guide_json is not None:
+            consultation.patient_guide_json = draft_in.patient_guide_json
+
         consultation.status = "PENDING_REVIEW"
         db.commit()
         db.refresh(consultation)
@@ -458,6 +495,145 @@ class ConsultationService:
         )
 
         return consultation
+
+    @staticmethod
+    def format_guide_texts(guide: PatientCareGuideSchema) -> tuple[str, str]:
+        """Format structured guide schema into clean readable English and Malayalam texts."""
+        en_lines = [
+            f"=== {guide.title_en} ===",
+            f"Diagnosis: {guide.diagnosis_summary_en}",
+            "\nMedication Schedule:",
+        ]
+        for m in guide.medication_schedule:
+            en_lines.append(f"• {m.medication}: {m.timing_en} ({m.purpose_en})")
+            if m.special_notes:
+                en_lines.append(f"  Note: {m.special_notes}")
+        en_lines.append("\nDietary & Lifestyle Advice:")
+        for d in guide.diet_and_lifestyle_en:
+            en_lines.append(f"• {d}")
+        en_lines.append("\nWarning Signs (Seek Urgent Care Immediately):")
+        for w in guide.warning_signs_en:
+            en_lines.append(f"⚠ {w}")
+        en_lines.append(f"\nFollow-up: {guide.follow_up_en}")
+
+        ml_lines = [
+            f"=== {guide.title_ml} ===",
+            f"രോഗ വിവരണം: {guide.diagnosis_summary_ml}",
+            "\nമരുന്ന് കഴിക്കേണ്ട വിധം:",
+        ]
+        for m in guide.medication_schedule:
+            ml_lines.append(f"• {m.medication}: {m.timing_ml} ({m.purpose_ml})")
+            if m.special_notes:
+                ml_lines.append(f"  പ്രത്യേക ശ്രദ്ധ: {m.special_notes}")
+        ml_lines.append("\nഭക്ഷണവും ജീവിതശൈലി നിർദ്ദേശങ്ങളും:")
+        for d in guide.diet_and_lifestyle_ml:
+            ml_lines.append(f"• {d}")
+        ml_lines.append("\nഅടിയന്തരമായി ഡോക്ടറെ കാണേണ്ട ലക്ഷണങ്ങൾ:")
+        for w in guide.warning_signs_ml:
+            ml_lines.append(f"⚠ {w}")
+        ml_lines.append(f"\nതുടർപരിശോധന: {guide.follow_up_ml}")
+
+        return "\n".join(en_lines), "\n".join(ml_lines)
+
+    @staticmethod
+    async def regenerate_patient_guide_for_consultation(
+        db: Session, consultation_id: str, actor: User
+    ) -> Consultation:
+        consultation = ConsultationService.get_by_id_or_code(db, consultation_id)
+        if not consultation:
+            raise ValueError(f"Consultation {consultation_id} not found")
+
+        ai = get_ai_provider()
+        patient = consultation.patient
+        patient_context = {
+            "name": patient.name,
+            "age": patient.age,
+            "gender": patient.gender,
+            "allergies": patient.allergies,
+            "existing_conditions": patient.existing_conditions,
+        }
+        diagnoses = [d.condition for d in consultation.diagnosis_suggestions]
+        rx_items = []
+        if consultation.prescription:
+            rx_items = [
+                {
+                    "medication_name": item.medication_name,
+                    "strength": item.strength,
+                    "dose": item.dose,
+                    "route": item.route,
+                    "frequency": item.frequency,
+                    "duration": item.duration,
+                    "instructions": item.instructions,
+                }
+                for item in consultation.prescription.items
+            ]
+
+        doc_notes = (
+            consultation.prescription.general_instructions
+            if consultation.prescription
+            else None
+        )
+        guide = await ai.generate_patient_guide(
+            patient_context=patient_context,
+            diagnoses=diagnoses,
+            medications=rx_items,
+            doctor_notes=doc_notes,
+        )
+        consultation.patient_guide_json = guide.model_dump()
+        en_text, ml_text = ConsultationService.format_guide_texts(guide)
+        consultation.patient_guide_english = en_text
+        consultation.patient_guide_malayalam = ml_text
+
+        db.commit()
+        db.refresh(consultation)
+
+        AuditService.log(
+            db,
+            action="PATIENT_GUIDE_REGENERATED",
+            actor_id=actor.id,
+            actor_name=actor.full_name,
+            actor_role=actor.role,
+            target_entity="Consultation",
+            target_id=consultation.consultation_id,
+            details=f"Doctor {actor.full_name} regenerated Bilingual Patient Care Guide.",
+        )
+        return consultation
+
+    @staticmethod
+    def update_patient_guide(
+        db: Session,
+        consultation_id: str,
+        guide_english: str | None,
+        guide_malayalam: str | None,
+        guide_json: dict | None,
+        actor: User,
+    ) -> Consultation:
+        consultation = ConsultationService.get_by_id_or_code(db, consultation_id)
+        if not consultation:
+            raise ValueError(f"Consultation {consultation_id} not found")
+
+        if guide_english is not None:
+            consultation.patient_guide_english = guide_english
+        if guide_malayalam is not None:
+            consultation.patient_guide_malayalam = guide_malayalam
+        if guide_json is not None:
+            consultation.patient_guide_json = guide_json
+
+        db.commit()
+        db.refresh(consultation)
+
+        AuditService.log(
+            db,
+            action="PATIENT_GUIDE_UPDATED",
+            actor_id=actor.id,
+            actor_name=actor.full_name,
+            actor_role=actor.role,
+            target_entity="Consultation",
+            target_id=consultation.consultation_id,
+            details=f"Doctor {actor.full_name} updated Bilingual Patient Care Guide.",
+        )
+        return consultation
+
 
     @staticmethod
     def approve_consultation(

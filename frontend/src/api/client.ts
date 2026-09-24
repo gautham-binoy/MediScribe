@@ -9,6 +9,7 @@ import {
   HospitalDashboardData,
   AuditLog,
   AIHealthStatus,
+  SafetyAlert,
 } from '@/types';
 
 const BASE_URL = '/api';
@@ -177,6 +178,46 @@ export const consultationsApi = {
     }
     return response.json();
   },
+  downloadPrescriptionPdf: async (id: string, consultationCode: string = 'Prescription'): Promise<void> => {
+    const token = localStorage.getItem('mediscribe_token');
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await fetch(`${BASE_URL}/consultations/${id}/prescription-pdf`, {
+      method: 'GET',
+      headers,
+    });
+    if (!response.ok) {
+      throw new ApiError('Failed to download prescription PDF', response.status);
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Prescription_${consultationCode}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+  checkSafety: (id: string, items: any[]): Promise<SafetyAlert[]> =>
+    request<SafetyAlert[]>(`/consultations/${id}/safety-check`, {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    }),
+  regeneratePatientGuide: (id: string): Promise<Consultation> =>
+    request<Consultation>(`/consultations/${id}/patient-guide`, {
+      method: 'POST',
+    }),
+  updatePatientGuide: (
+    id: string,
+    data: { patient_guide_english?: string; patient_guide_malayalam?: string; patient_guide_json?: any }
+  ): Promise<Consultation> =>
+    request<Consultation>(`/consultations/${id}/patient-guide`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
 };
 
 // 4. Hospital Dashboard API

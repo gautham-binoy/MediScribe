@@ -140,3 +140,7 @@ class SaveDraftRequest(BaseModel):
     investigations: list[InvestigationItemSchema] | None = None
     prescription: PrescriptionDraftSchema | None = None
     icd_codes: list[ICDItemSchema] | None = None
+    patient_guide_english: str | None = None
+    patient_guide_malayalam: str | None = None
+    patient_guide_json: dict | None = None
+

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -52,6 +53,19 @@ class ConsultationCreate(BaseModel):
     is_demo: bool = Field(default=True)
 
 
+from app.services.safety_service import SafetyAlert
+
+
+class PatientCareGuideUpdateRequest(BaseModel):
+    patient_guide_english: str | None = None
+    patient_guide_malayalam: str | None = None
+    patient_guide_json: dict | None = None
+
+
+class SafetyCheckRequest(BaseModel):
+    items: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class ConsultationResponse(BaseModel):
     id: str
     consultation_id: str
@@ -83,4 +97,13 @@ class ConsultationDetailResponse(ConsultationResponse):
     approval: ApprovalResponse | None = None
     rag_sources: list[str] = []
 
+    # Bilingual Patient Care Guide
+    patient_guide_english: str | None = None
+    patient_guide_malayalam: str | None = None
+    patient_guide_json: dict | None = None
+
+    # Live Clinical Safety & Conflict Alerts
+    safety_alerts: list[SafetyAlert] = []
+
     model_config = ConfigDict(from_attributes=True)
+

@@ -13,6 +13,7 @@ from app.ai.schemas.ai_schemas import (
     ICDListSchema,
     InvestigationListSchema,
     MultilingualNormalizationSchema,
+    PatientCareGuideSchema,
     PrescriptionDraftSchema,
     SOAPNoteSchema,
 )
@@ -425,3 +426,43 @@ class GeminiProvider(AIProvider):
             return await self._fallback_provider.suggest_icd_codes(
                 diagnoses, extraction, rag_context
             )
+
+    async def generate_patient_guide(
+        self,
+        patient_context: dict[str, Any],
+        diagnoses: list[str],
+        medications: list[dict[str, Any]],
+        doctor_notes: str | None = None,
+    ) -> PatientCareGuideSchema:
+        if not self._client:
+            return await self._fallback_provider.generate_patient_guide(
+                patient_context, diagnoses, medications, doctor_notes
+            )
+
+        template = _read_prompt("patient_guide.txt")
+        prompt = template.format(
+            patient_name=patient_context.get("name", "Patient"),
+            patient_age=patient_context.get("age", "Unknown"),
+            patient_gender=patient_context.get("gender", "Unknown"),
+            allergies=patient_context.get("allergies", "No known allergies"),
+            existing_conditions=patient_context.get("existing_conditions", "None"),
+            diagnoses=json.dumps(diagnoses),
+            medications=json.dumps(medications),
+            doctor_notes=doctor_notes or "Standard post-consultation recovery care",
+        )
+        try:
+            res = await self.generate_structured(
+                prompt=prompt,
+                schema_class=PatientCareGuideSchema,
+                system_instruction=(
+                    "You are a clinical communicator in Kerala, India. "
+                    "Produce an empathetic, clear Bilingual Patient Recovery Guide in proper English and authentic Malayalam script."
+                ),
+            )
+            return res
+        except Exception as e:
+            logger.warning(f"Error in Gemini patient guide generation: {e}. Using fallback.")
+            return await self._fallback_provider.generate_patient_guide(
+                patient_context, diagnoses, medications, doctor_notes
+            )
+

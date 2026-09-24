@@ -161,3 +161,32 @@ class MultilingualNormalizationSchema(BaseModel):
     key_findings_summary: str = Field(
         ..., description="Brief 1-2 sentence executive clinical summary"
     )
+
+
+class MedicationGuideItem(BaseModel):
+    medication: str = Field(..., description="Medication name and strength")
+    timing_en: str = Field(..., description="When to take in English, e.g. After breakfast")
+    timing_ml: str = Field(..., description="When to take in Malayalam, e.g. രാവിലെ ഭക്ഷണത്തിന് ശേഷം")
+    purpose_en: str = Field(..., description="Why to take in English, e.g. For pain and fever")
+    purpose_ml: str = Field(..., description="Why to take in Malayalam, e.g. പനിക്കും വേദനയ്ക്കും")
+    special_notes: str | None = Field(None, description="Precautions or food instructions")
+
+
+class PatientCareGuideSchema(BaseModel):
+    """
+    Bilingual Patient After-Care and Discharge Guide (English + Malayalam).
+    Provides patient-friendly explanations, medication schedules, dietary advice,
+    and emergency red-flag warning signs.
+    """
+    title_en: str = Field(default="Patient Care & Recovery Guide")
+    title_ml: str = Field(default="രോഗി പരിചരണ നിർദ്ദേശങ്ങൾ")
+    diagnosis_summary_en: str = Field(..., description="Simple, reassuring explanation of diagnosis in English")
+    diagnosis_summary_ml: str = Field(..., description="Simple explanation of diagnosis in Malayalam")
+    medication_schedule: list[MedicationGuideItem] = Field(default_factory=list)
+    diet_and_lifestyle_en: list[str] = Field(default_factory=list, description="Dietary and lifestyle tips in English")
+    diet_and_lifestyle_ml: list[str] = Field(default_factory=list, description="Dietary and lifestyle tips in Malayalam")
+    warning_signs_en: list[str] = Field(default_factory=list, description="Red flag danger signs in English")
+    warning_signs_ml: list[str] = Field(default_factory=list, description="Red flag danger signs in Malayalam")
+    follow_up_en: str = Field(..., description="Follow-up instructions in English")
+    follow_up_ml: str = Field(..., description="Follow-up instructions in Malayalam")
+

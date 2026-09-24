@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
-import { Prescription, PrescriptionItem } from '@/types';
-import { Pill, Plus, Trash2, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { Prescription, PrescriptionItem, SafetyAlert } from '@/types';
+import { Pill, Plus, Trash2, ShieldAlert, CheckCircle2, AlertCircle, ShieldCheck, FileDown, RotateCw } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 
 interface PrescriptionReviewProps {
   prescription: Prescription;
   patientAllergies?: string;
+  safetyAlerts?: SafetyAlert[];
+  onCheckSafety?: () => Promise<void>;
+  isCheckingSafety?: boolean;
+  onDownloadPdf?: () => void;
   onChange: (updated: Partial<Prescription>) => void;
   readOnly?: boolean;
 }
@@ -14,6 +18,10 @@ interface PrescriptionReviewProps {
 export const PrescriptionReview: React.FC<PrescriptionReviewProps> = ({
   prescription,
   patientAllergies,
+  safetyAlerts = [],
+  onCheckSafety,
+  isCheckingSafety = false,
+  onDownloadPdf,
   onChange,
   readOnly = false,
 }) => {
@@ -85,25 +93,90 @@ export const PrescriptionReview: React.FC<PrescriptionReviewProps> = ({
       </CardHeader>
 
       <CardContent className="p-4 space-y-4">
-        {/* Allergy Check Alert Banner */}
-        {patientAllergies?.toLowerCase().includes('penicillin') ? (
+        {/* Dynamic Live Drug-Allergy & Drug-Drug Conflict Alerts */}
+        {safetyAlerts && safetyAlerts.length > 0 ? (
+          <div className="space-y-3">
+            {safetyAlerts.map((alert, idx) => {
+              if (alert.severity === 'CRITICAL') {
+                return (
+                  <div
+                    key={idx}
+                    className="p-4 bg-rose-50 border-2 border-rose-400 rounded-xl text-xs space-y-2 shadow-xs"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-rose-950 font-bold text-sm">
+                        <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 animate-bounce" />
+                        <span>CRITICAL CONTRAINDICATION: {alert.title}</span>
+                      </div>
+                      <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-rose-600 text-white tracking-wide">
+                        BLOCKING SAFETY ALERT
+                      </span>
+                    </div>
+                    <div className="text-rose-900 font-medium">
+                      <strong>Conflict Identified:</strong> {alert.medication} ⇄ {alert.conflict_source}
+                    </div>
+                    <div className="text-rose-800 leading-relaxed bg-white/80 p-2.5 rounded-lg border border-rose-200">
+                      <strong>Clinical Risk:</strong> {alert.clinical_explanation}
+                    </div>
+                    <div className="text-emerald-950 bg-emerald-50/90 p-2.5 rounded-lg border border-emerald-300 font-medium">
+                      <strong>Physician Action / Recommendation:</strong> {alert.recommendation}
+                    </div>
+                  </div>
+                );
+              }
+
+              if (alert.severity === 'WARNING') {
+                return (
+                  <div
+                    key={idx}
+                    className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-xs space-y-1.5 shadow-2xs"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-amber-950 font-bold">
+                        <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>CAUTION: {alert.title}</span>
+                      </div>
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300">
+                        MODERATE CONFLICT
+                      </span>
+                    </div>
+                    <div className="text-amber-900">
+                      <strong>Conflict:</strong> {alert.medication} ({alert.conflict_source})
+                    </div>
+                    <div className="text-amber-800 text-[11px] leading-relaxed">
+                      {alert.clinical_explanation}
+                    </div>
+                    <div className="text-amber-950 font-semibold text-[11px] mt-0.5 bg-white/60 p-2 rounded-lg border border-amber-200">
+                      <strong>Recommendation:</strong> {alert.recommendation}
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  key={idx}
+                  className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs flex items-center justify-between gap-3"
+                >
+                  <div className="flex items-center gap-2 text-emerald-950 font-medium">
+                    <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <div>
+                      <span className="font-bold text-emerald-900">{alert.title}</span> — {alert.clinical_explanation}
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                    VERIFIED SAFE
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : patientAllergies?.toLowerCase().includes('penicillin') ? (
           <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-amber-900 font-semibold">
               <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
               <span>
                 ⚠ Penicillin allergy: <strong className="underline">{patientAllergies}</strong> (Beta-lactams strictly withheld by safety copilot)
-              </span>
-            </div>
-            <span className="text-[10px] text-amber-800 font-bold uppercase bg-amber-100/80 px-2 py-0.5 rounded-full border border-amber-200">
-              Safety Guard Active
-            </span>
-          </div>
-        ) : patientAllergies && !patientAllergies.toUpperCase().includes('NKDA') && !patientAllergies.toLowerCase().includes('none') && !patientAllergies.toLowerCase().includes('no known') ? (
-          <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-amber-900 font-semibold">
-              <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>
-                ⚠ Recorded Allergy: <strong className="underline">{patientAllergies}</strong> (Medications cross-checked)
               </span>
             </div>
             <span className="text-[10px] text-amber-800 font-bold uppercase bg-amber-100/80 px-2 py-0.5 rounded-full border border-amber-200">
@@ -213,19 +286,46 @@ export const PrescriptionReview: React.FC<PrescriptionReviewProps> = ({
           </table>
         </div>
 
-        {/* Add item button */}
-        {!readOnly && (
-          <div className="flex justify-between items-center pt-1">
+        {/* Add item and Actions toolbar */}
+        <div className="flex flex-wrap justify-between items-center gap-2 pt-1">
+          <div className="flex items-center gap-2">
+            {!readOnly && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowAddModal(!showAddModal)}
+                icon={<Plus className="w-3.5 h-3.5" />}
+              >
+                Add Medication
+              </Button>
+            )}
+
+            {onCheckSafety && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onCheckSafety}
+                isLoading={isCheckingSafety}
+                icon={<ShieldCheck className="w-3.5 h-3.5 text-brand-600" />}
+                title="Run live drug-allergy and drug-drug conflict checks"
+              >
+                Re-evaluate Safety Conflicts
+              </Button>
+            )}
+          </div>
+
+          {onDownloadPdf && (
             <Button
               size="sm"
               variant="outline"
-              onClick={() => setShowAddModal(!showAddModal)}
-              icon={<Plus className="w-3.5 h-3.5" />}
+              onClick={onDownloadPdf}
+              icon={<FileDown className="w-3.5 h-3.5 text-brand-600" />}
+              className="border-brand-200 hover:bg-brand-50 text-brand-900 font-semibold"
             >
-              Add Medication
+              Download Official Rx PDF
             </Button>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Inline Add Item Form */}
         {showAddModal && (

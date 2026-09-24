@@ -12,7 +12,9 @@ from app.ai.schemas.ai_schemas import (
     ICDListSchema,
     InvestigationItemSchema,
     InvestigationListSchema,
+    MedicationGuideItem,
     MultilingualNormalizationSchema,
+    PatientCareGuideSchema,
     PrescriptionDraftSchema,
     PrescriptionItemSchema,
     SOAPNoteSchema,
@@ -531,3 +533,135 @@ class MockProvider(AIProvider):
                 ),
             ]
         )
+
+    async def generate_patient_guide(
+        self,
+        patient_context: dict[str, Any],
+        diagnoses: list[str],
+        medications: list[dict[str, Any]],
+        doctor_notes: str | None = None,
+    ) -> PatientCareGuideSchema:
+        patient_name = patient_context.get("name", "Patient")
+        diag_str = ", ".join(diagnoses) if diagnoses else "Acute Upper Respiratory Condition"
+
+        med_schedule: list[MedicationGuideItem] = []
+        for m in medications:
+            med_name = m.get("medication_name", "")
+            lower_name = med_name.lower()
+            dose = m.get("dose", "1 tablet")
+            freq = m.get("frequency", "")
+
+            if any(k in lower_name for k in ["paracetamol", "calpol", "dolo", "crocin"]):
+                med_schedule.append(
+                    MedicationGuideItem(
+                        medication=f"{med_name} ({m.get('strength', '650mg')})",
+                        timing_en=f"{dose} after food, when having fever or severe pain (maximum 3 times a day)",
+                        timing_ml=f"ഭക്ഷണത്തിന് ശേഷം {dose}, പനിയോ കഠിനമായ വേദനയോ ഉള്ളപ്പോൾ (ദിവസത്തിൽ പരമാവധി 3 തവണ)",
+                        purpose_en="Reduces body temperature and relieves fever and headaches",
+                        purpose_ml="പനിയും തലവേദനയും കുറയ്ക്കാൻ സഹായിക്കുന്നു",
+                        special_notes="Maintain at least 6 hours gap between two doses. Do not exceed 3 doses in 24 hours.",
+                    )
+                )
+            elif any(k in lower_name for k in ["cetirizine", "levocetirizine", "allegra", "fexofenadine"]):
+                med_schedule.append(
+                    MedicationGuideItem(
+                        medication=f"{med_name} ({m.get('strength', '10mg')})",
+                        timing_en=f"{dose} at night before sleep",
+                        timing_ml=f"രാത്രി ഉറങ്ങുന്നതിന് തൊട്ടുമുമ്പ് {dose}",
+                        purpose_en="Relieves running nose, nasal congestion, and allergic sneezing",
+                        purpose_ml="മൂക്കൊലിപ്പ്, തുമ്മൽ, അലർജി എന്നിവ കുറയ്ക്കാൻ",
+                        special_notes="May cause mild sleepiness. Avoid driving or heavy machinery.",
+                    )
+                )
+            elif any(k in lower_name for k in ["azithromycin", "amoxicillin", "cefixime", "augmentin", "antibiotic"]):
+                med_schedule.append(
+                    MedicationGuideItem(
+                        medication=f"{med_name} ({m.get('strength', '500mg')})",
+                        timing_en=f"{dose} once daily at the same time every day (preferably 1 hr before meals)",
+                        timing_ml=f"ദിവസത്തിൽ ഒരു നേരം കൃത്യസമയത്ത് {dose} (ഭക്ഷണത്തിന് 1 മണിക്കൂർ മുൻപ് അഭികാമ്യം)",
+                        purpose_en="Antibiotic course - eradicates bacterial infection",
+                        purpose_ml="അണുബാധ പൂർണ്ണമായി മാറ്റാനുള്ള ആന്റിബയോട്ടിക്",
+                        special_notes="Complete the entire prescribed days even if you feel completely better.",
+                    )
+                )
+            elif any(k in lower_name for k in ["pantoprazole", "omeprazole", "rabeprazole"]):
+                med_schedule.append(
+                    MedicationGuideItem(
+                        medication=f"{med_name} ({m.get('strength', '40mg')})",
+                        timing_en=f"{dose} in the morning, 30 minutes before breakfast",
+                        timing_ml=f"രാവിലെ പ്രാതലിന് 30 മിനിറ്റ് മുൻപ് വെറുംവയറ്റിൽ {dose}",
+                        purpose_en="Prevents stomach acidity and gastric irritation from medications",
+                        purpose_ml="ഗ്യാസും അസിഡിറ്റിയും നെഞ്ചെരിച്ചിലും തടയാൻ",
+                        special_notes="Take with half a glass of plain water.",
+                    )
+                )
+            else:
+                med_schedule.append(
+                    MedicationGuideItem(
+                        medication=f"{med_name} ({m.get('strength', '')})",
+                        timing_en=f"{dose} - {freq}. {m.get('instructions') or 'As directed by physician'}",
+                        timing_ml=f"ഡോക്ടറുടെ നിർദ്ദേശപ്രകാരം കൃത്യസമയത്ത് കഴിക്കുക ({freq})",
+                        purpose_en="Prescribed clinical therapy",
+                        purpose_ml="രോഗശമനത്തിനായുള്ള നിർദ്ദിഷ്ട മരുന്ന്",
+                        special_notes=m.get("instructions"),
+                    )
+                )
+
+        if not med_schedule:
+            med_schedule.append(
+                MedicationGuideItem(
+                    medication="Paracetamol 650 mg",
+                    timing_en="1 tablet after food every 8 hours as needed for fever/pain",
+                    timing_ml="പനിയോ വേദനയോ ഉള്ളപ്പോൾ ഭക്ഷണത്തിന് ശേഷം 1 ഗുളിക വീതം (8 മണിക്കൂർ ഇടവിട്ട്)",
+                    purpose_en="Fever and pain relief",
+                    purpose_ml="പനിക്കും ശരീരവേദനയ്ക്കും",
+                    special_notes="Drink warm water after taking.",
+                )
+            )
+
+        return PatientCareGuideSchema(
+            title_en="Patient Care & Recovery Instructions",
+            title_ml="രോഗി പരിചരണ നിർദ്ദേശങ്ങൾ",
+            diagnosis_summary_en=(
+                f"You have been clinically diagnosed with {diag_str}. "
+                "With adequate rest, proper hydration, and adhering strictly to the prescribed medicines, "
+                "a swift and full recovery is expected within 3 to 5 days."
+            ),
+            diagnosis_summary_ml=(
+                f"താങ്കൾക്ക് {diag_str} എന്ന അസുഖമാണ് കണ്ടെത്തിയിട്ടുള്ളത്. "
+                "പരിഭ്രാന്തരാകേണ്ടതില്ല; ഡോക്ടർ നിർദ്ദേശിച്ച മരുന്നുകൾ കൃത്യസമയത്ത് കഴിക്കുകയും "
+                "ധാരാളം വിശ്രമവും വെള്ളവും എടുക്കുകയും ചെയ്താൽ 3-5 ദിവസങ്ങൾക്കുള്ളിൽ പൂർണ്ണ സുഖം പ്രാപിക്കാം."
+            ),
+            medication_schedule=med_schedule,
+            diet_and_lifestyle_en=[
+                "Drink 2.5 to 3 liters of warm, boiled water throughout the day to stay thoroughly hydrated.",
+                "Eat warm, fresh, and easily digestible home-cooked meals such as rice porridge (kanji) or vegetable soup.",
+                "Strictly avoid cold drinks, refrigerated items, oily foods, and heavy spices during recovery.",
+                "Ensure at least 7 to 8 hours of uninterrupted night sleep and minimize strenuous physical work.",
+                "Gargle with warm salt water 2-3 times daily if throat soreness or tickle persists.",
+            ],
+            diet_and_lifestyle_ml=[
+                "ധാരാളം തിളപ്പിച്ചാറിയ ചെറുചൂടുവെള്ളം കുടിക്കുക (ദിവസവും 2.5 മുതൽ 3 ലിറ്റർ വരെ).",
+                "എളുപ്പത്തിൽ ദഹിക്കുന്ന ലഘുഭക്ഷണം (കഞ്ഞി, വെജിറ്റബിൾ സൂപ്പ് മുതലായവ) ചൂടോടെ കഴിക്കുക.",
+                "തണുത്ത വെള്ളം, ഐസ്ക്രീം, എണ്ണയിൽ വറുത്ത ഭക്ഷണങ്ങൾ, അമിതമായ എരിവ് എന്നിവ കർശനമായി ഒഴിവാക്കുക.",
+                "ദിവസവും കുറഞ്ഞത് 7-8 മണിക്കൂർ സുഖമായി ഉറങ്ങുകയും അമിത അധ്വാനം ഒഴിവാക്കുകയും ചെയ്യുക.",
+                "തൊണ്ടവേദനയുണ്ടെങ്കിൽ ചെറുചൂടുള്ള ഉപ്പുവെള്ളം കൊണ്ട് ദിവസത്തിൽ 2-3 തവണ വായ് കൊപ്ലിക്കുക.",
+            ],
+            warning_signs_en=[
+                "High fever persisting above 102°F despite taking antipyretic medication.",
+                "Breathing difficulty, shortness of breath, wheezing, or chest tightness.",
+                "Persistent vomiting, severe dehydration, or inability to swallow fluids.",
+                "Sudden body rash, hives, or swelling around lips/eyes.",
+                "Unusual dizziness, extreme sleepiness, or confusion.",
+            ],
+            warning_signs_ml=[
+                "മരുന്ന് കഴിച്ചിട്ടും കുറയാത്ത കഠിനമായ പനി (102°F-ൽ കൂടുതൽ).",
+                "ശ്വാസമെടുക്കാൻ ബുദ്ധിമുട്ട്, കിതപ്പ്, അല്ലെങ്കിൽ നെഞ്ചിൽ ഭാരം അനുഭവപ്പെടുക.",
+                "തുടർച്ചയായ ഛർദ്ദി അല്ലെങ്കിൽ വെള്ളം പോലും കുടിക്കാൻ കഴിയാത്ത അവസ്ഥ.",
+                "ശരീരത്തിൽ അപ്രതീക്ഷിതമായി ഉണ്ടാകുന്ന തടിപ്പുകൾ, ചൊറിച്ചിൽ, മുഖത്തോ ചുണ്ടിലോ വീക്കം.",
+                "കടുത്ത തലകറക്കം, അമിതമായ ക്ഷീണം അല്ലെങ്കിൽ ബോധക്കേട്.",
+            ],
+            follow_up_en="Please return for an OPD review in 3 to 5 days, or visit the hospital Emergency room immediately if any red-flag warning signs occur.",
+            follow_up_ml="3 മുതൽ 5 ദിവസങ്ങൾക്കുശേഷം വീണ്ടും ഡോക്ടറെ കാണുക. എന്തെങ്കിലും അടിയന്തര ലക്ഷണങ്ങൾ കണ്ടാൽ ഉടൻ ആശുപത്രിയിലെത്തുക.",
+        )
+

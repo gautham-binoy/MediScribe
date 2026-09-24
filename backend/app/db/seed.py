@@ -26,6 +26,22 @@ def seed_database():
     logger.info("Initializing database tables...")
     Base.metadata.create_all(bind=engine)
 
+    # Column migration check for SQLite
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            res = conn.execute(text("PRAGMA table_info(consultations)")).fetchall()
+            col_names = [r[1] for r in res]
+            if "patient_guide_english" not in col_names:
+                conn.execute(text("ALTER TABLE consultations ADD COLUMN patient_guide_english TEXT"))
+            if "patient_guide_malayalam" not in col_names:
+                conn.execute(text("ALTER TABLE consultations ADD COLUMN patient_guide_malayalam TEXT"))
+            if "patient_guide_json" not in col_names:
+                conn.execute(text("ALTER TABLE consultations ADD COLUMN patient_guide_json JSON"))
+            conn.commit()
+    except Exception as col_err:
+        logger.warning(f"Column migration notice: {col_err}")
+
     db = SessionLocal()
     try:
         # 1. Seed Users & Doctors

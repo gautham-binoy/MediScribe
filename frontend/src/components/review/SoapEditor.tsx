@@ -1,7 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { SOAPNote } from '@/types';
-import { FileText, ShieldAlert, Sparkles } from 'lucide-react';
+import {
+  FileText,
+  ShieldAlert,
+  Sparkles,
+  Copy,
+  Check,
+  UserCheck,
+  Stethoscope,
+  Activity,
+  ClipboardList,
+} from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { useToast } from '@/contexts/ToastContext';
 
 interface SoapEditorProps {
   soap: SOAPNote;
@@ -14,106 +26,173 @@ export const SoapEditor: React.FC<SoapEditorProps> = ({
   onChange,
   readOnly = false,
 }) => {
+  const { success } = useToast();
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyNote = () => {
+    const formatted = `SOAP PROGRESS NOTE
+================================
+[S] SUBJECTIVE:
+${soap.subjective || ''}
+
+[O] OBJECTIVE:
+${soap.objective || ''}
+
+[A] ASSESSMENT:
+${soap.assessment || ''}
+
+[P] PLAN:
+${soap.plan || ''}
+================================
+Disclaimer: ${soap.disclaimer || 'AI GENERATED - REVIEWED BY PHYSICIAN'}`;
+
+    navigator.clipboard.writeText(formatted);
+    setCopied(true);
+    success('Copied to Clipboard', 'Full SOAP note formatted and copied.');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
-    <Card className="border-slate-200 shadow-sm">
-      <CardHeader className="bg-slate-50/70 p-4 pb-3 flex flex-row items-center justify-between">
+    <div className="space-y-4">
+      {/* SOAP Header Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center font-bold">
+            <FileText className="w-4 h-4" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Clinical SOAP Progress Note</h3>
+            <p className="text-xs text-slate-500">Standardized medical progress documentation</p>
+          </div>
+        </div>
+
         <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4 text-brand-600" />
-          <CardTitle className="text-sm font-bold text-slate-800">
-            SOAP PROGRESS NOTE
-          </CardTitle>
-        </div>
+          {soap.is_ai_draft ? (
+            <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-bold tracking-wide uppercase">
+              <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
+              AI DRAFT • VERIFY & EDIT
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold tracking-wide uppercase">
+              <span className="w-2 h-2 rounded-full bg-emerald-600" />
+              VERIFIED BY PHYSICIAN
+            </span>
+          )}
 
-        {/* Mandatory Safety Label */}
-        {soap.is_ai_draft ? (
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-bold tracking-wide uppercase shadow-xs">
-            <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
-            AI DRAFT • REQUIRES DOCTOR REVIEW
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCopyNote}
+            icon={copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
+            className="text-xs"
+          >
+            {copied ? 'Copied' : 'Copy SOAP'}
+          </Button>
+        </div>
+      </div>
+
+      {/* 4 Distinct, Readable SOAP Sections */}
+      <div className="grid grid-cols-1 gap-4">
+        {/* S — Subjective */}
+        <div className="bg-white rounded-2xl border border-sky-200/80 shadow-2xs overflow-hidden transition-all hover:border-sky-300">
+          <div className="bg-sky-50/60 px-4 py-2.5 border-b border-sky-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-lg bg-sky-600 text-white font-bold text-xs flex items-center justify-center">
+                S
+              </span>
+              <span className="text-xs font-bold text-sky-950 uppercase tracking-wide">
+                Subjective — Patient Narrative & Reported History
+              </span>
+            </div>
+            <span className="text-[10px] font-medium text-sky-700">Symptoms, Onset, Chief Complaint</span>
           </div>
-        ) : (
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold tracking-wide uppercase shadow-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
-            APPROVED CLINICAL RECORD
+          <div className="p-4">
+            <textarea
+              rows={4}
+              value={soap.subjective || ''}
+              disabled={readOnly}
+              onChange={(e) => onChange({ subjective: e.target.value })}
+              className="w-full text-sm font-sans bg-transparent border-0 text-slate-800 leading-relaxed focus:ring-0 focus:outline-none resize-y min-h-[90px]"
+              placeholder="Patient reported symptoms, onset, and chronological experience..."
+            />
           </div>
-        )}
-      </CardHeader>
-
-      <CardContent className="p-4 space-y-4">
-        {/* Subjective */}
-        <div>
-          <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center justify-between">
-            <span className="text-brand-800">S — Subjective (Patient Narrative & HPI)</span>
-            <span className="text-[10px] text-slate-400 font-normal">Editable</span>
-          </label>
-          <textarea
-            rows={3}
-            value={soap.subjective || ''}
-            disabled={readOnly}
-            onChange={(e) => onChange({ subjective: e.target.value })}
-            className="w-full text-xs font-sans bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 leading-relaxed focus:bg-white focus:ring-1 focus:ring-brand-500 focus:outline-none transition-colors"
-          />
         </div>
 
-        {/* Objective */}
-        <div>
-          <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center justify-between">
-            <span className="text-brand-800">O — Objective (Vitals & Physical Findings)</span>
-            <span className="text-[10px] text-slate-400 font-normal">Editable</span>
-          </label>
-          <textarea
-            rows={3}
-            value={soap.objective || ''}
-            disabled={readOnly}
-            onChange={(e) => onChange({ objective: e.target.value })}
-            className="w-full text-xs font-sans bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 leading-relaxed focus:bg-white focus:ring-1 focus:ring-brand-500 focus:outline-none transition-colors"
-          />
+        {/* O — Objective */}
+        <div className="bg-white rounded-2xl border border-indigo-200/80 shadow-2xs overflow-hidden transition-all hover:border-indigo-300">
+          <div className="bg-indigo-50/60 px-4 py-2.5 border-b border-indigo-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-lg bg-indigo-600 text-white font-bold text-xs flex items-center justify-center">
+                O
+              </span>
+              <span className="text-xs font-bold text-indigo-950 uppercase tracking-wide">
+                Objective — Clinical Vitals & Physical Findings
+              </span>
+            </div>
+            <span className="text-[10px] font-medium text-indigo-700">Measurable Findings & Observations</span>
+          </div>
+          <div className="p-4">
+            <textarea
+              rows={3}
+              value={soap.objective || ''}
+              disabled={readOnly}
+              onChange={(e) => onChange({ objective: e.target.value })}
+              className="w-full text-sm font-sans bg-transparent border-0 text-slate-800 leading-relaxed focus:ring-0 focus:outline-none resize-y min-h-[80px]"
+              placeholder="Vital signs, physical exam observations, general appearance..."
+            />
+          </div>
         </div>
 
-        {/* Assessment */}
-        <div>
-          <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center justify-between">
-            <span className="text-brand-800">A — Assessment (Clinical Formulation & Differentials)</span>
-            <span className="text-[10px] text-slate-400 font-normal">Editable</span>
-          </label>
-          <textarea
-            rows={3}
-            value={soap.assessment || ''}
-            disabled={readOnly}
-            onChange={(e) => onChange({ assessment: e.target.value })}
-            className="w-full text-xs font-sans bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 leading-relaxed focus:bg-white focus:ring-1 focus:ring-brand-500 focus:outline-none transition-colors"
-          />
+        {/* A — Assessment */}
+        <div className="bg-white rounded-2xl border border-purple-200/80 shadow-2xs overflow-hidden transition-all hover:border-purple-300">
+          <div className="bg-purple-50/60 px-4 py-2.5 border-b border-purple-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-lg bg-purple-600 text-white font-bold text-xs flex items-center justify-center">
+                A
+              </span>
+              <span className="text-xs font-bold text-purple-950 uppercase tracking-wide">
+                Assessment — Clinical Evaluation & Differential Diagnosis
+              </span>
+            </div>
+            <span className="text-[10px] font-medium text-purple-700">Impression & Disease Staging</span>
+          </div>
+          <div className="p-4">
+            <textarea
+              rows={3}
+              value={soap.assessment || ''}
+              disabled={readOnly}
+              onChange={(e) => onChange({ assessment: e.target.value })}
+              className="w-full text-sm font-sans bg-transparent border-0 text-slate-800 leading-relaxed focus:ring-0 focus:outline-none resize-y min-h-[80px]"
+              placeholder="Clinical evaluation, suspected diagnosis, illness status..."
+            />
+          </div>
         </div>
 
-        {/* Plan */}
-        <div>
-          <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center justify-between">
-            <span className="text-brand-800">P — Plan (Therapy, Workup, Red Flags & Follow-up)</span>
-            <span className="text-[10px] text-slate-400 font-normal">Editable</span>
-          </label>
-          <textarea
-            rows={4}
-            value={soap.plan || ''}
-            disabled={readOnly}
-            onChange={(e) => onChange({ plan: e.target.value })}
-            className="w-full text-xs font-sans bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 leading-relaxed focus:bg-white focus:ring-1 focus:ring-brand-500 focus:outline-none transition-colors"
-          />
+        {/* P — Plan */}
+        <div className="bg-white rounded-2xl border border-teal-200/80 shadow-2xs overflow-hidden transition-all hover:border-teal-300">
+          <div className="bg-teal-50/60 px-4 py-2.5 border-b border-teal-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-lg bg-teal-600 text-white font-bold text-xs flex items-center justify-center">
+                P
+              </span>
+              <span className="text-xs font-bold text-teal-950 uppercase tracking-wide">
+                Plan — Management, Investigations & Follow-Up Criteria
+              </span>
+            </div>
+            <span className="text-[10px] font-medium text-teal-700">Patient Guidance, Labs & Review</span>
+          </div>
+          <div className="p-4">
+            <textarea
+              rows={4}
+              value={soap.plan || ''}
+              disabled={readOnly}
+              onChange={(e) => onChange({ plan: e.target.value })}
+              className="w-full text-sm font-sans bg-transparent border-0 text-slate-800 leading-relaxed focus:ring-0 focus:outline-none resize-y min-h-[90px]"
+              placeholder="Therapeutic management, lab tests, patient advice, follow-up..."
+            />
+          </div>
         </div>
-
-        {/* Attending Doctor Clinical Addendum */}
-        <div className="pt-2 border-t border-slate-100">
-          <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
-            <span>Attending Physician Final Clinical Addendum / Notes:</span>
-          </label>
-          <textarea
-            rows={2}
-            value={soap.doctor_notes || ''}
-            disabled={readOnly}
-            onChange={(e) => onChange({ doctor_notes: e.target.value })}
-            placeholder="Add doctor remarks, patient counseling notes, or specific verbal instructions given..."
-            className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-slate-900 focus:bg-white focus:ring-1 focus:ring-brand-500 focus:outline-none"
-          />
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };

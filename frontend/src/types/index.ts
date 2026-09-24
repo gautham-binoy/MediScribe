@@ -189,6 +189,46 @@ export interface Consultation {
   icd_suggestions?: ICDSuggestion[];
   approval?: Approval;
   rag_sources?: string[];
+
+  // Bilingual Patient Care Guide
+  patient_guide_english?: string;
+  patient_guide_malayalam?: string;
+  patient_guide_json?: PatientCareGuide;
+
+  // Live Clinical Safety & Conflict Alerts
+  safety_alerts?: SafetyAlert[];
+}
+
+export interface SafetyAlert {
+  severity: 'CRITICAL' | 'WARNING' | 'INFO' | 'SAFE';
+  medication: string;
+  conflict_source: string;
+  title: string;
+  clinical_explanation: string;
+  recommendation: string;
+}
+
+export interface MedicationGuideItem {
+  medication: string;
+  timing_en: string;
+  timing_ml: string;
+  purpose_en: string;
+  purpose_ml: string;
+  special_notes?: string;
+}
+
+export interface PatientCareGuide {
+  title_en: string;
+  title_ml: string;
+  diagnosis_summary_en: string;
+  diagnosis_summary_ml: string;
+  medication_schedule: MedicationGuideItem[];
+  diet_and_lifestyle_en: string[];
+  diet_and_lifestyle_ml: string[];
+  warning_signs_en: string[];
+  warning_signs_ml: string[];
+  follow_up_en: string;
+  follow_up_ml: string;
 }
 
 export interface PatientHistoryItem {

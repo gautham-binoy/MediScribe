@@ -50,7 +50,11 @@ export const PatientsPage: React.FC = () => {
     if (!newPatient.patient_id.trim() || !newPatient.name.trim()) return;
 
     try {
-      await patientsApi.create(newPatient);
+      const payload: any = {
+        ...newPatient,
+        email: newPatient.email && newPatient.email.trim() ? newPatient.email.trim() : undefined,
+      };
+      await patientsApi.create(payload);
       success('Patient Registered', `${newPatient.name} (${newPatient.patient_id}) added.`);
       setShowCreateModal(false);
       fetchPatients();
@@ -271,15 +275,28 @@ export const PatientsPage: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Allergies</label>
+              <label className="block font-semibold text-slate-700 mb-1">
+                Email <span className="text-slate-400 font-normal text-xs">(Optional)</span>
+              </label>
               <input
-                type="text"
-                value={newPatient.allergies}
-                onChange={(e) => setNewPatient({ ...newPatient, allergies: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-amber-800"
-                placeholder="e.g. Penicillin / NKDA"
+                type="email"
+                value={newPatient.email}
+                onChange={(e) => setNewPatient({ ...newPatient, email: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2"
+                placeholder="patient@example.com"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">Allergies</label>
+            <input
+              type="text"
+              value={newPatient.allergies}
+              onChange={(e) => setNewPatient({ ...newPatient, allergies: e.target.value })}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-amber-800"
+              placeholder="e.g. Penicillin / NKDA"
+            />
           </div>
 
           <div>

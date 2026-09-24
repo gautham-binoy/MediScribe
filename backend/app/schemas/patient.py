@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class PatientBase(BaseModel):
@@ -18,6 +18,13 @@ class PatientBase(BaseModel):
     current_medications: str | None = "None"
     emergency_contact: str | None = None
 
+    @field_validator("email", mode="before")
+    @classmethod
+    def validate_email_empty(cls, v):
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
 
 class PatientCreate(BaseModel):
     name: str
@@ -34,6 +41,13 @@ class PatientCreate(BaseModel):
     current_medications: str | None = "None"
     emergency_contact: str | None = None
 
+    @field_validator("email", mode="before")
+    @classmethod
+    def validate_email_empty(cls, v):
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
 
 class PatientUpdate(BaseModel):
     name: str | None = None
@@ -43,6 +57,13 @@ class PatientUpdate(BaseModel):
     phone: str | None = None
     email: EmailStr | None = None
     address: str | None = None
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def validate_email_empty(cls, v):
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
     blood_group: str | None = None
     allergies: str | None = None
     existing_conditions: str | None = None

@@ -22,8 +22,11 @@ def get_ai_provider() -> AIProvider:
         return _provider_instances["mock"]
 
     if provider_type == "gemini":
-        if not settings.GEMINI_API_KEY:
-            logger.warning("GEMINI_API_KEY is not configured. Falling back to MockProvider.")
+        from app.core.gemini_keys import get_gemini_key_manager
+
+        km = get_gemini_key_manager()
+        if not km.has_keys:
+            logger.warning("No Gemini API keys are configured. Falling back to MockProvider.")
             if "mock" not in _provider_instances:
                 _provider_instances["mock"] = MockProvider()
             return _provider_instances["mock"]

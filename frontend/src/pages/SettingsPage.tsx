@@ -100,23 +100,81 @@ export const SettingsPage: React.FC = () => {
 
         <CardContent className="p-5 space-y-3">
           <div className="space-y-2 text-xs">
-            {/* Gemini */}
-            <div className="p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-between">
-              <div>
-                <div className="font-bold text-slate-900">Google Gemini API (Primary Provider)</div>
-                <div className="text-[11px] text-slate-500">
-                  Multilingual audio transcription, structured clinical entity extraction, and function calling.
+            {/* Gemini Multi-Key Pool */}
+            <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-bold text-slate-900 flex items-center gap-2">
+                    Google Gemini API Pool
+                    {aiStatus?.gemini_pool && (
+                      <span className="px-2 py-0.5 rounded-md bg-brand-50 border border-brand-200 text-brand-800 text-[10px] font-mono">
+                        {aiStatus.gemini_pool.active_count} Active / {aiStatus.gemini_pool.total_configured} Configured
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    Load-balanced across multiple API keys with automatic failover and 429 rate limit backoff.
+                  </div>
                 </div>
+                <span
+                  className={`px-2.5 py-1 rounded-full font-semibold text-xs ${
+                    aiStatus?.gemini_pool && aiStatus.gemini_pool.active_count > 0
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      : 'bg-amber-50 text-amber-800 border border-amber-200'
+                  }`}
+                >
+                  {aiStatus?.credentials.gemini}
+                </span>
               </div>
-              <span
-                className={`px-2.5 py-1 rounded-full font-semibold text-xs ${
-                  aiStatus?.credentials.gemini === 'Configured'
-                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                    : 'bg-amber-50 text-amber-800 border border-amber-200'
-                }`}
-              >
-                {aiStatus?.credentials.gemini}
-              </span>
+
+              {/* Individual Keys Status */}
+              {aiStatus?.gemini_pool?.keys && aiStatus.gemini_pool.keys.length > 0 && (
+                <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                    Configured Keys in Failover Pool:
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {aiStatus.gemini_pool.keys.map((k, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2 rounded-lg border border-slate-100 bg-slate-50 flex items-center justify-between text-xs font-mono"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              !k.is_active
+                                ? 'bg-rose-500'
+                                : k.in_cooldown
+                                ? 'bg-amber-500 animate-pulse'
+                                : 'bg-emerald-500'
+                            }`}
+                          />
+                          <span className="text-slate-800 font-semibold">{k.masked}</span>
+                        </div>
+                        <div className="text-[11px]">
+                          {k.in_cooldown ? (
+                            <span className="text-amber-700 bg-amber-100/60 px-1.5 py-0.5 rounded">
+                              Cooldown ({k.cooldown_remaining_sec}s)
+                            </span>
+                          ) : k.is_active ? (
+                            <span className="text-emerald-700 bg-emerald-100/60 px-1.5 py-0.5 rounded">
+                              Ready
+                            </span>
+                          ) : (
+                            <span className="text-rose-700 bg-rose-100/60 px-1.5 py-0.5 rounded">
+                              Auth Error
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                💡 <strong>Tip:</strong> Add multiple keys in your backend <code className="text-brand-700 font-mono">.env</code> via <code className="text-brand-700 font-mono">GEMINI_API_KEYS=key1,key2,key3</code>. MediScribe will automatically distribute requests and fail over instantly if any key hits quota.
+              </div>
             </div>
 
             {/* OpenAI */}

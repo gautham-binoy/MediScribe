@@ -40,66 +40,101 @@ class GeminiProvider(AIProvider):
 
     def __init__(self):
         self._fallback_provider = MockProvider()
-        self.api_key = settings.GEMINI_API_KEY
-        self.model_name = settings.AI_MODEL or "gemini-3.1-pro-preview"
-        self._client = None
+        from app.core.gemini_keys import get_gemini_key_manager
 
-        if self.api_key and not settings.DEMO_MODE:
+        self._key_manager = get_gemini_key_manager()
+        self.model_name = settings.AI_MODEL or "gemini-3.5-flash-lite"
+
+    @property
+    def has_keys(self) -> bool:
+        return self._key_manager.has_keys and not settings.DEMO_MODE
+
+    @property
+    def _client(self):
+        if self.has_keys:
             try:
-                from google import genai
-
-                self._client = genai.Client(api_key=self.api_key)
-                logger.info("Gemini Client initialized successfully.")
-            except Exception as e:
-                logger.warning(
-                    f"Failed to initialize Gemini Client: {e}. Will fallback to MockProvider."
-                )
+                client, _ = self._key_manager.get_client()
+                return client
+            except Exception:
+                return None
+        return None
 
     @property
     def provider_name(self) -> str:
         return "gemini"
 
     async def _call_gemini_generate(self, contents: Any, config: Any) -> str:
-        """Call Gemini API with non-blocking executor, timeout, rate limit & model cascade resilience."""
-        if not self._client:
-            raise RuntimeError("Gemini client is not initialized or API key is missing.")
+        """Call Gemini API with multi-key pool, timeout, rate limit & model cascade resilience."""
+        if not self.has_keys:
+            raise RuntimeError("Gemini client is not initialized or API keys are missing.")
 
         models_to_try = [self.model_name]
-        for m in ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-3.8-flash"]:
+        for m in [
+            "gemini-3.5-flash-lite",
+            "gemini-3.5-flash",
+            "gemini-3.6-flash",
+            "gemini-3.1-flash-lite",
+            "gemini-3.8-flash",
+        ]:
             if m not in models_to_try:
                 models_to_try.append(m)
 
         last_error = None
-        for model_to_use in models_to_try:
-            for attempt in range(2):
-                try:
-                    def _sync_call():
-                        return self._client.models.generate_content(
-                            model=model_to_use,
-                            contents=contents,
-                            config=config,
-                        )
-                    response = await asyncio.wait_for(asyncio.to_thread(_sync_call), timeout=20.0)
-                    return response.text or ""
-                except TimeoutError:
-                    logger.warning(f"Model '{model_to_use}' timed out after 20s (attempt {attempt + 1}).")
-                    last_error = TimeoutError(f"Model '{model_to_use}' timed out.")
-                except Exception as e:
-                    err_str = str(e).lower()
-                    last_error = e
-                    is_transient = "503" in err_str or "unavailable" in err_str or "demand" in err_str or "429" in err_str
-                    if is_transient and attempt == 0:
+        for client, api_key in self._key_manager.get_cascade():
+            masked = api_key[:6] + "..." + api_key[-4:] if len(api_key) > 10 else "key"
+            key_rate_limited = False
+
+            for model_to_use in models_to_try:
+                for attempt in range(2):
+                    try:
+                        def _sync_call():
+                            return client.models.generate_content(
+                                model=model_to_use,
+                                contents=contents,
+                                config=config,
+                            )
+
+                        response = await asyncio.wait_for(asyncio.to_thread(_sync_call), timeout=20.0)
+                        self._key_manager.report_success(api_key)
+                        return response.text or ""
+                    except TimeoutError:
                         logger.warning(
-                            f"Model '{model_to_use}' returned transient error ({err_str[:100]}). Retrying..."
+                            f"Model '{model_to_use}' timed out on key [{masked}] after 20s (attempt {attempt + 1})."
                         )
-                        await asyncio.sleep(1.0)
-                        continue
-                    else:
-                        logger.warning(f"Model '{model_to_use}' failed ({err_str[:120]}). Trying next candidate...")
-                        break
+                        last_error = TimeoutError(f"Model '{model_to_use}' timed out.")
+                    except Exception as e:
+                        err_str = str(e).lower()
+                        last_error = e
+                        if "429" in err_str or "resource_exhausted" in err_str or "quota" in err_str:
+                            logger.warning(
+                                f"Key [{masked}] reached rate limit / quota on model '{model_to_use}'. Switching to next key in pool..."
+                            )
+                            self._key_manager.report_rate_limit(api_key, cooldown_seconds=60.0)
+                            key_rate_limited = True
+                            break
+                        is_transient = (
+                            "503" in err_str or "unavailable" in err_str or "demand" in err_str
+                        )
+                        if is_transient and attempt == 0:
+                            logger.warning(
+                                f"Model '{model_to_use}' on key [{masked}] returned 503 high demand. Retrying..."
+                            )
+                            await asyncio.sleep(1.0)
+                            continue
+                        else:
+                            logger.warning(
+                                f"Model '{model_to_use}' on key [{masked}] failed ({err_str[:100]}). Trying next candidate..."
+                            )
+                            break
+
+                if key_rate_limited:
+                    break
+
+            if key_rate_limited:
+                continue
 
         if last_error:
-            logger.error(f"All Gemini models failed in cascade: {last_error}")
+            logger.error(f"All Gemini models and keys failed in cascade: {last_error}")
             raise last_error
         raise RuntimeError("Gemini generation returned empty text.")
 

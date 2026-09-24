@@ -4,6 +4,7 @@ import re
 import tempfile
 
 from app.core.config import settings
+from app.core.gemini_keys import get_gemini_key_manager
 from app.core.logging import logger
 from app.transcription.base import BaseTranscriber, TranscriptionResult, TranscriptionSegment
 from app.transcription.mock_transcriber import MockTranscriber
@@ -13,15 +14,20 @@ class GeminiTranscriber(BaseTranscriber):
     """
     Multimodal Gemini Audio Transcriber supporting English, Malayalam, and code-switching (Manglish).
 
-    Uses native Google GenAI SDK multimodal audio input with automated model cascade
-    (gemini-3.5-flash-lite, gemini-3.5-flash, gemini-3.6-flash, etc.) for high quota resilience.
+    Uses native Google GenAI SDK multimodal audio input with multi-key pool manager
+    and automated model cascade (gemini-3.5-flash-lite, gemini-3.5-flash, gemini-3.6-flash, etc.)
+    for zero-interruption high quota resilience.
     Supports MP3, WAV, WebM, M4A, AAC, OGG, FLAC formats.
-    Falls back to MockTranscriber only when explicitly in DEMO_MODE or when GEMINI_API_KEY is unset.
+    Falls back to MockTranscriber only when explicitly in DEMO_MODE or when no Gemini keys are configured.
     """
 
     def __init__(self):
         self._fallback = MockTranscriber()
-        self.api_key = settings.GEMINI_API_KEY
+        self._key_manager = get_gemini_key_manager()
+
+    @property
+    def has_api_keys(self) -> bool:
+        return self._key_manager.has_keys
 
     async def transcribe_audio(
         self,
@@ -30,11 +36,11 @@ class GeminiTranscriber(BaseTranscriber):
         language_preference: str = "Auto Detect",
     ) -> TranscriptionResult:
         """
-        Transcribe audio bytes using Gemini multimodal audio model cascade.
+        Transcribe audio bytes using Gemini multimodal audio model and key cascade.
         """
         # When demo mode is active or no API key is provided, use deterministic demo mock
-        if not self.api_key or settings.DEMO_MODE:
-            logger.info("Using mock transcriber (DEMO_MODE=true or no GEMINI_API_KEY).")
+        if not self.has_api_keys or settings.DEMO_MODE:
+            logger.info("Using mock transcriber (DEMO_MODE=true or no Gemini API keys).")
             return await self._fallback.transcribe_audio(
                 audio_bytes, content_type, language_preference
             )
@@ -110,7 +116,6 @@ class GeminiTranscriber(BaseTranscriber):
         from google import genai
         from google.genai import types
 
-        client = genai.Client(api_key=self.api_key)
         mime_type = self._clean_mime_type(content_type)
 
         system_prompt = (
@@ -139,51 +144,68 @@ class GeminiTranscriber(BaseTranscriber):
             if m not in candidate_models:
                 candidate_models.append(m)
 
-        audio_content = None
         tmp_path = None
+        is_inline = len(audio_bytes) < 20 * 1024 * 1024
         try:
-            # Inline audio part for audio under 20MB (ultra-fast, zero Files API roundtrip)
-            if len(audio_bytes) < 20 * 1024 * 1024:
-                audio_content = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
-                logger.info(
-                    f"Transcribing {len(audio_bytes)} bytes of {mime_type} audio using inline Part..."
-                )
-            else:
+            if not is_inline:
                 ext = self._ext_for_content_type(content_type)
                 with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmpf:
                     tmpf.write(audio_bytes)
                     tmp_path = tmpf.name
-                logger.info(
-                    f"Uploading large audio ({len(audio_bytes)} bytes) to Gemini Files API..."
-                )
-                audio_content = client.files.upload(file=tmp_path)
-                logger.info(f"File uploaded successfully: {audio_content.name}")
 
             last_error = None
-            for model_name in candidate_models:
-                try:
-                    logger.info(f"Transcribing audio with Gemini model '{model_name}'...")
-                    response = client.models.generate_content(
-                        model=model_name,
-                        contents=[audio_content, system_prompt],
-                    )
-                    text = response.text or ""
-                    if text.strip():
+            # Cascade through available API keys in key pool
+            for client, api_key in self._key_manager.get_cascade():
+                masked = api_key[:6] + "..." + api_key[-4:] if len(api_key) > 10 else "key"
+                if is_inline:
+                    audio_content = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
+                else:
+                    audio_content = client.files.upload(file=tmp_path)
+
+                key_rate_limited = False
+                for model_name in candidate_models:
+                    try:
                         logger.info(
-                            f"Transcription complete with model '{model_name}'. Output: {len(text)} chars."
+                            f"Transcribing audio with model '{model_name}' using API key [{masked}]..."
                         )
-                        return text
-                except Exception as model_err:
-                    err_msg = str(model_err)
-                    logger.warning(
-                        f"Model '{model_name}' failed during transcription ({err_msg[:120]}). Trying next candidate..."
-                    )
-                    last_error = model_err
-                    continue
+                        response = client.models.generate_content(
+                            model=model_name,
+                            contents=[audio_content, system_prompt],
+                        )
+                        text = response.text or ""
+                        if text.strip():
+                            self._key_manager.report_success(api_key)
+                            logger.info(
+                                f"Transcription complete with model '{model_name}' on key [{masked}]. Output: {len(text)} chars."
+                            )
+                            return text
+                    except Exception as model_err:
+                        err_msg = str(model_err).lower()
+                        last_error = model_err
+                        if "429" in err_msg or "resource_exhausted" in err_msg or "quota" in err_msg:
+                            logger.warning(
+                                f"API key [{masked}] reached rate limit / quota. Switching to next key in pool..."
+                            )
+                            self._key_manager.report_rate_limit(api_key, cooldown_seconds=60.0)
+                            key_rate_limited = True
+                            break  # Try next API key
+                        elif "503" in err_msg or "unavailable" in err_msg or "demand" in err_msg:
+                            logger.warning(
+                                f"Model '{model_name}' on key [{masked}] returned 503 high demand. Trying next model..."
+                            )
+                            continue
+                        else:
+                            logger.warning(
+                                f"Model '{model_name}' on key [{masked}] failed ({str(model_err)[:100]}). Trying next candidate..."
+                            )
+                            continue
+
+                if key_rate_limited:
+                    continue  # Seamlessly switch to next key in pool
 
             if last_error:
                 raise last_error
-            raise RuntimeError("All transcription candidate models returned empty responses.")
+            raise RuntimeError("All transcription candidate models and API keys returned empty responses.")
 
         finally:
             if tmp_path and os.path.exists(tmp_path):

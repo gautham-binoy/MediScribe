@@ -266,6 +266,23 @@ export interface AuditLog {
   timestamp: string;
 }
 
+export interface GeminiKeyInfo {
+  masked: string;
+  is_active: boolean;
+  in_cooldown: boolean;
+  cooldown_remaining_sec: number;
+  success_count: number;
+  failure_count: number;
+  error_reason?: string | null;
+}
+
+export interface GeminiPoolStatus {
+  total_configured: number;
+  active_count: number;
+  ready_count: number;
+  keys: GeminiKeyInfo[];
+}
+
 export interface AIHealthStatus {
   active_provider: string;
   configured_provider: string;
@@ -278,6 +295,7 @@ export interface AIHealthStatus {
     openai: string;
     anthropic: string;
   };
+  gemini_pool?: GeminiPoolStatus;
   status: string;
   notice: string;
 }

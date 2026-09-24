@@ -38,6 +38,11 @@ def get_health(db: Session = Depends(get_db)) -> dict[str, Any]:
 @router.get("/health/ai")
 def get_ai_health() -> dict[str, Any]:
     ai_provider = get_ai_provider()
+    from app.core.gemini_keys import get_gemini_key_manager
+
+    km = get_gemini_key_manager()
+    gemini_pool = km.get_pool_status()
+    has_gemini = km.has_keys
 
     return {
         "active_provider": ai_provider.provider_name,
@@ -47,13 +52,18 @@ def get_ai_health() -> dict[str, Any]:
         "rag_enabled": settings.RAG_ENABLED,
         "transcription_mode": settings.TRANSCRIPTION_MODE,
         "credentials": {
-            "gemini": "Configured" if bool(settings.GEMINI_API_KEY) else "Not configured",
+            "gemini": (
+                f"Configured ({gemini_pool['active_count']} active / {gemini_pool['total_configured']} key(s))"
+                if has_gemini
+                else "Not configured"
+            ),
             "openai": "Configured" if bool(settings.OPENAI_API_KEY) else "Not configured",
             "anthropic": "Configured" if bool(settings.ANTHROPIC_API_KEY) else "Not configured",
         },
+        "gemini_pool": gemini_pool,
         "status": (
             "active"
-            if (settings.DEMO_MODE or settings.GEMINI_API_KEY)
+            if (settings.DEMO_MODE or has_gemini)
             else "warning_fallback_to_mock"
         ),
         "notice": "Operating with synthetic patient safety constraints. AI suggestions require explicit physician sign-off.",
